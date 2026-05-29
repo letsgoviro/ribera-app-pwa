@@ -1,0 +1,124 @@
+name: ribera-api
+region: fra1
+
+# ── API Service — $5/mo (512MB RAM, 1 vCPU) ──────────────────────────────────
+# Frontends (web, organiser, admin) are deployed to Vercel FREE tier.
+# Database: Supabase free PostgreSQL. Storage: Supabase free (1GB).
+# Total spend: $5/month.
+
+services:
+  - name: api
+    github:
+      repo: your-org/ribera
+      branch: main
+      deploy_on_push: true
+    source_dir: apps/api
+    build_command: pnpm install --frozen-lockfile && pnpm exec prisma generate && pnpm run build
+    run_command: node dist/index.js
+    http_port: 3001
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    instance_count: 1
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 15
+      period_seconds: 60
+      failure_threshold: 3
+    routes:
+      - path: /
+    envs:
+      - key: NODE_ENV
+        value: production
+        scope: RUN_TIME
+      - key: PORT
+        value: "3001"
+        scope: RUN_TIME
+
+      # Supabase (set these as encrypted secrets in DO dashboard)
+      - key: SUPABASE_URL
+        scope: RUN_TIME
+        type: SECRET
+      - key: SUPABASE_ANON_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        type: SECRET
+      - key: DIRECT_URL
+        scope: RUN_TIME
+        type: SECRET
+
+      # DPO Pay
+      - key: DPO_COMPANY_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+      - key: DPO_COMPANY_ID
+        scope: RUN_TIME
+        type: SECRET
+      - key: DPO_SERVICE_TYPE
+        value: "110331"
+        scope: RUN_TIME
+      - key: DPO_CURRENCY
+        value: TZS
+        scope: RUN_TIME
+      - key: DPO_ENVIRONMENT
+        value: production
+        scope: RUN_TIME
+      - key: DPO_API_URL
+        value: https://secure.3gdirectpay.com/API/v6/
+        scope: RUN_TIME
+      - key: DPO_PAYMENT_URL
+        value: https://secure.3gdirectpay.com/payv2.php
+        scope: RUN_TIME
+
+      # Brevo Email
+      - key: BREVO_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: BREVO_SMTP_HOST
+        value: smtp-relay.brevo.com
+        scope: RUN_TIME
+      - key: BREVO_SMTP_PORT
+        value: "587"
+        scope: RUN_TIME
+      - key: BREVO_SMTP_USER
+        scope: RUN_TIME
+        type: SECRET
+      - key: FROM_EMAIL
+        value: tickets@ribera.app
+        scope: RUN_TIME
+      - key: FROM_NAME
+        value: Ribera
+        scope: RUN_TIME
+
+      # Supabase Storage
+      - key: SUPABASE_STORAGE_BUCKET
+        value: ribera-assets
+        scope: RUN_TIME
+
+      # OAuth
+      - key: OAUTH_CLIENT_ID
+        scope: RUN_TIME
+        type: SECRET
+      - key: OAUTH_CLIENT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: OAUTH_REDIRECT_URL
+        value: https://ribera.app/auth/callback
+        scope: RUN_TIME
+
+      # Security
+      - key: QR_JWT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: ADMIN_EMAIL_DOMAIN
+        value: ribera.app
+        scope: RUN_TIME
+      - key: SERVICE_FEE_PERCENT
+        value: "5"
+        scope: RUN_TIME
+      - key: ENABLE_BOOST
+        value: "true"
+        scope: RUN_TIME

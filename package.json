@@ -1,0 +1,27 @@
+{
+  "name": "ribera",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm exec turbo run dev",
+    "build": "pnpm exec turbo run build",
+    "lint": "pnpm exec turbo run lint",
+    "type-check": "pnpm exec turbo run type-check",
+    "dev:web": "pnpm exec turbo run dev --filter=@ribera/web",
+    "dev:organiser": "pnpm exec turbo run dev --filter=@ribera/organiser",
+    "dev:admin": "pnpm exec turbo run dev --filter=@ribera/admin",
+    "dev:api": "pnpm exec turbo run dev --filter=@ribera/api",
+    "db:migrate": "pnpm exec turbo run db:migrate --filter=@ribera/api",
+    "db:studio": "pnpm exec turbo run db:studio --filter=@ribera/api",
+    "setup": "pnpm install && pnpm --filter @ribera/api exec prisma generate"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "typescript": "^5.8.0",
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": "22.x",
+    "pnpm": ">=11.0.0"
+  },
+  "packageManager": "pnpm@11.3.0"
+}

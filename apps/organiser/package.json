@@ -1,0 +1,42 @@
+{
+  "name": "@ribera/organiser",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3002",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ribera/config": "workspace:*",
+    "@ribera/types": "workspace:*",
+    "@supabase/supabase-js": "^2.49.0",
+    "@tanstack/react-query": "^5.75.0",
+    "axios": "^1.9.0",
+    "framer-motion": "^12.0.0",
+    "html5-qrcode": "^2.3.8",
+    "lucide-react": "^0.513.0",
+    "next": "15.3.2",
+    "@ducanh2912/next-pwa": "^10.2.9",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-hook-form": "^7.56.0",
+    "recharts": "^2.15.0",
+    "zustand": "^5.0.0",
+    "zod": "^3.24.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@tailwindcss/postcss": "^4.1.7",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^4.1.7",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["/Users/apple/Downloads/RIBERA_APP_PWA_NEW/apps/web/node_modules/next/dist/bin/next", "dev", "-p", "3000"],
+      "cwd": "/Users/apple/Downloads/RIBERA_APP_PWA_NEW/apps/web",
+      "port": 3000,
+      "autoPort": false
+    },
+    {
+      "name": "organiser",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["/Users/apple/Downloads/RIBERA_APP_PWA_NEW/apps/organiser/node_modules/next/dist/bin/next", "dev", "-p", "3002"],
+      "cwd": "/Users/apple/Downloads/RIBERA_APP_PWA_NEW/apps/organiser",
+      "port": 3002,
+      "autoPort": false
+    },
+    {
+      "name": "admin",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["/Users/apple/Downloads/RIBERA_APP_PWA_NEW/apps/admin/node_modules/next/dist/bin/next", "dev", "-p", "3003"],
+      "cwd": "/Users/apple/Downloads/RIBERA_APP_PWA_NEW/apps/admin",
+      "port": 3003,
+      "autoPort": false
+    }
+  ]
+}

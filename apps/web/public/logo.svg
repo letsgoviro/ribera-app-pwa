@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <!-- Teal background rounded square -->
+  <rect width="500" height="500" rx="90" ry="90" fill="#2AB99E"/>
+  <!-- White circle -->
+  <circle cx="250" cy="250" r="188" fill="#ffffff"/>
+  <!-- U-magnet with two people: drawn as a single compound shape -->
+  <!-- Left arm of U (thicker, taller person) -->
+  <rect x="142" y="158" width="76" height="180" rx="38" fill="#2AB99E"/>
+  <!-- Right arm of U (slightly shorter person) -->
+  <rect x="282" y="175" width="76" height="163" rx="38" fill="#2AB99E"/>
+  <!-- U bottom connector (semi-circle) -->
+  <path d="M142 290 Q142 388 250 388 Q358 388 358 290 L358 338 Q358 418 250 418 Q142 418 142 338 Z" fill="#2AB99E"/>
+  <!-- Simpler U bottom: rect + half circle -->
+  <rect x="142" y="290" width="76" height="90" fill="#2AB99E"/>
+  <rect x="282" y="290" width="76" height="90" fill="#2AB99E"/>
+  <ellipse cx="250" cy="380" rx="108" ry="60" fill="#2AB99E"/>
+  <!-- Cover top of ellipse to make half-ellipse -->
+  <rect x="142" y="320" width="216" height="60" fill="#2AB99E"/>
+  <!-- Left person head (larger) -->
+  <circle cx="180" cy="145" r="36" fill="#2AB99E"/>
+  <!-- Right person head (slightly smaller, offset inward) -->
+  <circle cx="320" cy="160" r="30" fill="#2AB99E"/>
+</svg>

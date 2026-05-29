@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #e6f0ff;
+  --color-brand-100: #b3ccff;
+  --color-brand-500: #0066FF;
+  --color-brand-600: #0052cc;
+  --color-accent-500: #F5A623;
+  --color-surface-900: var(--surface-900);
+  --color-surface-800: var(--surface-800);
+  --color-surface-700: var(--surface-700);
+  --color-surface-600: var(--surface-600);
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+/* ── Dark theme (default) ───────────────────────────────────────────── */
+:root, .dark {
+  --surface-900: #0A0A0F;
+  --surface-800: #141420;
+  --surface-700: #1E1E2E;
+  --surface-600: #28283A;
+  color-scheme: dark;
+}
+
+/* ── Light theme ────────────────────────────────────────────────────── */
+.light {
+  --surface-900: #F5F5FA;
+  --surface-800: #FFFFFF;
+  --surface-700: #EEEEF6;
+  --surface-600: #DDDDE8;
+  color-scheme: light;
+}
+
+/* In light mode, invert default text colors */
+.light body {
+  background-color: var(--surface-900);
+  color: #0A0A0F;
+}
+.light .text-white   { color: #0A0A0F !important; }
+.light .text-gray-400 { color: #555565 !important; }
+.light .text-gray-500 { color: #6B6B7B !important; }
+.light .text-gray-600 { color: #7A7A8A !important; }
+.light .text-gray-700 { color: #8A8A9A !important; }
+.light .text-gray-300 { color: #333345 !important; }
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+  overscroll-behavior: none;
+  background-color: var(--surface-900);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-600); border-radius: 2px; }
+
+/* Safe area insets for PWA */
+.safe-top    { padding-top: env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }

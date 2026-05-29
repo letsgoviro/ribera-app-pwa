@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "strict": true,
+    "strictNullChecks": true,
+    "exactOptionalPropertyTypes": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "incremental": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@ribera/types": ["../../packages/types/src/index.ts"],
+      "@ribera/config": ["../../packages/config/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*", "../../packages/types/src/**/*", "../../packages/config/src/**/*"]
+}

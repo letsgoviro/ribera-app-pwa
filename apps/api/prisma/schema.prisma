@@ -1,0 +1,327 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  customer
+  organiser
+  admin
+}
+
+enum EventStatus {
+  draft
+  published
+  cancelled
+  completed
+}
+
+enum OrderStatus {
+  pending
+  reserved
+  paid
+  cancelled
+  refunded
+}
+
+enum TicketStatus {
+  valid
+  used
+  cancelled
+  transferred
+}
+
+enum BoostStatus {
+  pending
+  active
+  expired
+  cancelled
+}
+
+enum SmsCampaignStatus {
+  not_applicable
+  pending_credits
+  sent
+}
+
+enum PayoutStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum EventType {
+  paid
+  free
+  donation
+  online
+  hybrid
+}
+
+enum TierType {
+  general    // Standard admission
+  vip        // VIP / premium
+  table      // Full table reservation
+  seat       // Individual reserved seat
+  standing   // Standing area / dance floor
+  online     // Virtual / stream access
+}
+
+// ─── Profiles ─────────────────────────────────────────────────────────────────
+// Mirrors Supabase auth.users — populated via webhook on user creation
+
+model Profile {
+  id           String    @id @db.Uuid
+  display_name String?
+  avatar_url   String?
+  phone        String?   @unique
+  role         UserRole  @default(customer)
+  city         String?
+  created_at   DateTime  @default(now())
+
+  organiser    Organiser?
+  orders       Order[]
+  tickets      Ticket[]   @relation("BuyerTickets")
+  held_tickets Ticket[]   @relation("HolderTickets")
+
+  @@map("profiles")
+}
+
+// ─── Organisers ──────────────────────────────────────────────────────────────
+
+model Organiser {
+  id          String    @id @default(uuid()) @db.Uuid
+  user_id     String    @unique @db.Uuid
+  org_name    String
+  bio         String?
+  logo_url    String?
+  banner_url  String?
+  website     String?
+  social_links Json     @default("{}")
+  verified    Boolean   @default(false)
+  verified_at DateTime?
+  id_doc_url      String?
+  full_name       String?     // Legal full name of the organiser contact
+  phone           String?     // Direct contact phone
+  payout_details  Json        @default("{}")  // {method, bank_name, account_number, account_name, mobile_money_number}
+  balance         BigInt      @default(0)
+  created_at  DateTime  @default(now())
+
+  profile     Profile   @relation(fields: [user_id], references: [id])
+  events      Event[]
+  boosts      Boost[]
+  payouts     Payout[]
+
+  @@map("organisers")
+}
+
+// ─── Events ───────────────────────────────────────────────────────────────────
+
+model Event {
+  id              String      @id @default(uuid()) @db.Uuid
+  organiser_id    String      @db.Uuid
+  title           String
+  slug            String      @unique
+  description     String?
+  cover_image_url String?
+  gallery_urls    String[]    @default([])
+  category        String
+  event_type      EventType   @default(paid)
+  venue_name      String?
+  address         String?
+  lat             Decimal?    @db.Decimal(10, 8)
+  lng             Decimal?    @db.Decimal(11, 8)
+  online_url      String?
+  venue_code      String?     // Door code / access code (shown to ticket holders)
+  timetable_url   String?     // Link to schedule / timetable
+  starts_at       DateTime
+  ends_at         DateTime?
+  timezone        String      @default("Africa/Dar_es_Salaam")
+  status          EventStatus @default(draft)
+  min_age         Int         @default(0)
+  allow_transfer  Boolean     @default(true)
+  refund_policy   String      @default("24h")
+  published_at    DateTime?
+  cancelled_at    DateTime?
+  created_at      DateTime    @default(now())
+
+  organiser       Organiser   @relation(fields: [organiser_id], references: [id], onDelete: Cascade)
+  tiers           TicketTier[]
+  promo_codes     PromoCode[]
+  orders          Order[]
+  tickets         Ticket[]
+  boosts          Boost[]
+
+  @@index([organiser_id])
+  @@index([status, starts_at])
+  @@index([category])
+  @@map("events")
+}
+
+// ─── Ticket Tiers ─────────────────────────────────────────────────────────────
+
+model TicketTier {
+  id              String    @id @default(uuid()) @db.Uuid
+  event_id        String    @db.Uuid
+  name            String
+  description     String?
+  price           BigInt
+  currency        String    @default("TZS") @db.Char(3)
+  quantity        Int
+  sold            Int       @default(0)
+  tier_type       TierType  @default(general)
+  max_per_order   Int       @default(10)   // e.g. max 1 for table reservations
+  seats_per_unit  Int       @default(1)    // e.g. 8 for "Table for 8"
+  sale_starts     DateTime?
+  sale_ends       DateTime?
+  sort_order      Int       @default(0)
+  created_at      DateTime  @default(now())
+
+  event       Event     @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  tickets     Ticket[]
+
+  @@index([event_id])
+  @@map("ticket_tiers")
+}
+
+// ─── Promo Codes ──────────────────────────────────────────────────────────────
+
+model PromoCode {
+  id             String    @id @default(uuid()) @db.Uuid
+  event_id       String    @db.Uuid
+  code           String
+  discount_type  String
+  discount_value BigInt
+  max_uses       Int?
+  used_count     Int       @default(0)
+  expires_at     DateTime?
+  created_at     DateTime  @default(now())
+
+  event          Event     @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  orders         Order[]
+
+  @@unique([event_id, code])
+  @@map("promo_codes")
+}
+
+// ─── Orders ───────────────────────────────────────────────────────────────────
+
+model Order {
+  id              String      @id @default(uuid()) @db.Uuid
+  user_id         String      @db.Uuid
+  event_id        String      @db.Uuid
+  status          OrderStatus @default(pending)
+  items           Json
+  subtotal        BigInt
+  service_fee     BigInt
+  total           BigInt
+  currency        String      @default("TZS") @db.Char(3)
+  promo_code_id   String?     @db.Uuid
+  discount_amount BigInt      @default(0)
+  attendee_name   String
+  attendee_email  String
+  attendee_phone  String
+  custom_fields   Json        @default("{}")
+  dpo_token       String?
+  dpo_ref         String?
+  reserved_until  DateTime?
+  paid_at         DateTime?
+  created_at      DateTime    @default(now())
+
+  user            Profile     @relation(fields: [user_id], references: [id])
+  event           Event       @relation(fields: [event_id], references: [id])
+  promo_code      PromoCode?  @relation(fields: [promo_code_id], references: [id])
+  tickets         Ticket[]
+
+  @@index([user_id])
+  @@index([event_id])
+  @@index([status])
+  @@map("orders")
+}
+
+// ─── Tickets ──────────────────────────────────────────────────────────────────
+
+model Ticket {
+  id              String       @id @default(uuid()) @db.Uuid
+  order_id        String       @db.Uuid
+  event_id        String       @db.Uuid
+  tier_id         String       @db.Uuid
+  buyer_id        String       @db.Uuid
+  holder_id       String       @db.Uuid
+  qr_token        String       @unique
+  status          TicketStatus @default(valid)
+  checked_in_at   DateTime?
+  checked_in_by   String?      @db.Uuid
+  transferred_at  DateTime?
+  created_at      DateTime     @default(now())
+
+  order           Order        @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  event           Event        @relation(fields: [event_id], references: [id])
+  tier            TicketTier   @relation(fields: [tier_id], references: [id])
+  buyer           Profile      @relation("BuyerTickets", fields: [buyer_id], references: [id])
+  holder          Profile      @relation("HolderTickets", fields: [holder_id], references: [id])
+
+  @@index([buyer_id])
+  @@index([holder_id])
+  @@index([qr_token])
+  @@index([event_id, status])
+  @@map("tickets")
+}
+
+// ─── Boosts ───────────────────────────────────────────────────────────────────
+
+model Boost {
+  id           String      @id @default(uuid()) @db.Uuid
+  event_id     String      @db.Uuid
+  organiser_id String      @db.Uuid
+  package      String
+  placement    String
+  price_paid   BigInt
+  currency     String      @default("TZS") @db.Char(3)
+  starts_at    DateTime
+  ends_at      DateTime
+  dpo_ref      String?
+  status       BoostStatus       @default(active)
+  sms_status   SmsCampaignStatus @default(not_applicable)
+  sms_sent_at  DateTime?
+  impressions  Int         @default(0)
+  clicks       Int         @default(0)
+  created_at   DateTime    @default(now())
+
+  event        Event       @relation(fields: [event_id], references: [id])
+  organiser    Organiser   @relation(fields: [organiser_id], references: [id])
+
+  @@index([status, ends_at])
+  @@index([event_id])
+  @@map("boosts")
+}
+
+// ─── Payouts ──────────────────────────────────────────────────────────────────
+
+model Payout {
+  id              String       @id @default(uuid()) @db.Uuid
+  organiser_id    String       @db.Uuid
+  amount          BigInt
+  currency        String       @default("TZS") @db.Char(3)
+  method          String
+  account_details Json
+  status          PayoutStatus @default(pending)
+  requested_at    DateTime     @default(now())
+  processed_at    DateTime?
+  admin_note      String?
+  reference       String?
+
+  organiser       Organiser    @relation(fields: [organiser_id], references: [id])
+
+  @@index([organiser_id])
+  @@index([status])
+  @@map("payouts")
+}
