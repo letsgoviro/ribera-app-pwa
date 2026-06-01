@@ -1,6 +1,7 @@
 {
-  "buildCommand": "cd ../.. && pnpm exec turbo run build --filter=@ribera/web",
+  "buildCommand": "cd ../.. && pnpm install --frozen-lockfile && pnpm exec turbo run build --filter=@ribera/web",
   "framework": "nextjs",
+  "installCommand": "echo 'installed by buildCommand'",
   "headers": [
     {
       "source": "/sw.js",

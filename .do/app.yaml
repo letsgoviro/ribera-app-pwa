@@ -1,39 +1,89 @@
-name: ribera-api
+name: ribera-app
 region: fra1
 
-# ── API Service — $5/mo (512MB RAM, 1 vCPU) ──────────────────────────────────
-# Frontends (web, organiser, admin) are deployed to Vercel FREE tier.
-# Database: Supabase free PostgreSQL. Storage: Supabase free (1GB).
-# Total spend: $5/month.
+# ─────────────────────────────────────────────────────────────────────────────
+# Ribera V2 — DigitalOcean App Platform deployment
+#
+# Architecture:
+#   API (Fastify)     → DO App Platform  ~$5/mo (512MB, 1vCPU)
+#   Database          → DO Managed PG    ~$15/mo (1GB RAM, 10GB, no pausing)
+#   Auth              → Supabase Auth    FREE (JWT verification only)
+#   Storage (images)  → Supabase Storage FREE (1GB, no DB dependency)
+#   Web/Org/Admin     → Vercel           FREE
+#   Total server cost: ~$20/month
+#
+# Setup steps:
+#   1. Create DB: doctl databases create ribera-db --engine pg --version 16 --region fra1 --size db-s-1vcpu-1gb
+#   2. Link app to DB in DO console (Dashboard → App → Settings → App-Level Env → Add database)
+#      OR update this file with the database component and redeploy.
+#   3. Add secrets in DO console (App → Settings → Environment Variables)
+#   4. Push to GitHub — auto-deploys on main branch push
+# ─────────────────────────────────────────────────────────────────────────────
 
+# ── Managed PostgreSQL cluster ────────────────────────────────────────────────
+# DO injects ${db.DATABASE_URL} automatically when this component is present.
+# This replaces the Supabase DB — Supabase is now used for AUTH ONLY.
+databases:
+  - name: db
+    engine: PG
+    version: "16"
+    size: db-s-1vcpu-1gb    # $15/mo — 1GB RAM, 10GB disk, no pausing
+    num_nodes: 1
+    production: true
+
+# ── API Service ───────────────────────────────────────────────────────────────
 services:
   - name: api
     github:
-      repo: your-org/ribera
+      repo: letsgoviro/ribera-app-pwa
       branch: main
       deploy_on_push: true
     source_dir: apps/api
-    build_command: pnpm install --frozen-lockfile && pnpm exec prisma generate && pnpm run build
+    build_command: >
+      npm install -g pnpm &&
+      pnpm install --frozen-lockfile &&
+      pnpm exec prisma generate &&
+      pnpm exec prisma migrate deploy &&
+      pnpm run build
     run_command: node dist/index.js
     http_port: 3001
     instance_size_slug: apps-s-1vcpu-0.5gb
     instance_count: 1
     health_check:
       http_path: /health
-      initial_delay_seconds: 15
+      initial_delay_seconds: 20
       period_seconds: 60
       failure_threshold: 3
+      success_threshold: 1
     routes:
       - path: /
+
     envs:
+      # ── Runtime ──────────────────────────────────────────────────────────────
       - key: NODE_ENV
         value: production
         scope: RUN_TIME
       - key: PORT
         value: "3001"
         scope: RUN_TIME
+      - key: PUBLIC_WEB_URL
+        value: https://ribera.app
+        scope: RUN_TIME
 
-      # Supabase (set these as encrypted secrets in DO dashboard)
+      # ── Database — injected from the databases component above ───────────────
+      # DO automatically provides DATABASE_URL when a database is linked.
+      # For Prisma we need both the pooled URL (runtime) and direct URL (migrations).
+      # DO's managed PG provides a connection pool via PgBouncer on port 25060.
+      - key: DATABASE_URL
+        value: ${db.DATABASE_URL}        # pooled connection (PgBouncer port 25060)
+        scope: RUN_TIME
+      - key: DIRECT_URL
+        value: ${db.DATABASE_URL}        # same host; Prisma uses this for migrations only
+        scope: BUILD_TIME
+
+      # ── Supabase AUTH ONLY — no DB access needed ────────────────────────────
+      # These are used solely for: JWT verification, user management, Google OAuth
+      # The Supabase PostgreSQL is no longer used as application database.
       - key: SUPABASE_URL
         scope: RUN_TIME
         type: SECRET
@@ -43,14 +93,8 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         scope: RUN_TIME
         type: SECRET
-      - key: DATABASE_URL
-        scope: RUN_TIME
-        type: SECRET
-      - key: DIRECT_URL
-        scope: RUN_TIME
-        type: SECRET
 
-      # DPO Pay
+      # ── DPO Pay ──────────────────────────────────────────────────────────────
       - key: DPO_COMPANY_TOKEN
         scope: RUN_TIME
         type: SECRET
@@ -64,7 +108,7 @@ services:
         value: TZS
         scope: RUN_TIME
       - key: DPO_ENVIRONMENT
-        value: production
+        value: live
         scope: RUN_TIME
       - key: DPO_API_URL
         value: https://secure.3gdirectpay.com/API/v6/
@@ -73,8 +117,14 @@ services:
         value: https://secure.3gdirectpay.com/payv2.php
         scope: RUN_TIME
 
-      # Brevo Email
+      # ── Brevo (email + SMS) ───────────────────────────────────────────────────
       - key: BREVO_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: BREVO_SMTP_USER
+        scope: RUN_TIME
+        type: SECRET
+      - key: BREVO_SMTP_PASS
         scope: RUN_TIME
         type: SECRET
       - key: BREVO_SMTP_HOST
@@ -83,22 +133,20 @@ services:
       - key: BREVO_SMTP_PORT
         value: "587"
         scope: RUN_TIME
-      - key: BREVO_SMTP_USER
-        scope: RUN_TIME
-        type: SECRET
       - key: FROM_EMAIL
-        value: tickets@ribera.app
+        value: support@riberaapp.me
         scope: RUN_TIME
       - key: FROM_NAME
         value: Ribera
         scope: RUN_TIME
+      # TEST_EMAIL_OVERRIDE — leave unset in production (only set in dev .env)
 
-      # Supabase Storage
+      # ── Supabase Storage (images) — kept on Supabase free tier ───────────────
       - key: SUPABASE_STORAGE_BUCKET
         value: ribera-assets
         scope: RUN_TIME
 
-      # OAuth
+      # ── OAuth ────────────────────────────────────────────────────────────────
       - key: OAUTH_CLIENT_ID
         scope: RUN_TIME
         type: SECRET
@@ -109,13 +157,18 @@ services:
         value: https://ribera.app/auth/callback
         scope: RUN_TIME
 
-      # Security
+      # ── Security ─────────────────────────────────────────────────────────────
       - key: QR_JWT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: WEBHOOK_SECRET
         scope: RUN_TIME
         type: SECRET
       - key: ADMIN_EMAIL_DOMAIN
         value: ribera.app
         scope: RUN_TIME
+
+      # ── Feature flags ─────────────────────────────────────────────────────────
       - key: SERVICE_FEE_PERCENT
         value: "5"
         scope: RUN_TIME

@@ -4,7 +4,10 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
+  // DATABASE_URL — pooled connection via PgBouncer (DO port 25060 or Supabase port 6543)
+  // Append ?pgbouncer=true&connection_limit=10&pool_timeout=20 for pooled connections
   url       = env("DATABASE_URL")
+  // DIRECT_URL — used only for prisma migrate/push (bypasses PgBouncer)
   directUrl = env("DIRECT_URL")
 }
 
