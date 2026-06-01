@@ -29,6 +29,9 @@ function CheckoutContent() {
   const [attendeePhone, setAttendeePhone] = useState('')
   const [promoCode, setPromoCode] = useState('')
   const [promoApplied, setPromoApplied] = useState(false)
+  const [promoDiscount, setPromoDiscount] = useState(0)
+  const [promoLoading, setPromoLoading] = useState(false)
+  const [promoError, setPromoError] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -56,8 +59,10 @@ function CheckoutContent() {
     return sum + (item ? item.quantity * tier.price : 0)
   }, 0) ?? 0
 
-  const serviceFee = Math.floor(subtotal * SERVICE_FEE_PERCENT / 100)
-  const total = subtotal + serviceFee
+  const discount = promoApplied ? promoDiscount : 0
+  const discountedSubtotal = subtotal - discount
+  const serviceFee = Math.floor(discountedSubtotal * SERVICE_FEE_PERCENT / 100)
+  const total = discountedSubtotal + serviceFee
 
   const handlePlaceOrder = async () => {
     if (!attendeeName || !attendeeEmail || !attendeePhone) {
@@ -142,6 +147,12 @@ function CheckoutContent() {
               <span className="text-gray-500">Subtotal</span>
               <span className="text-gray-300">{currency} {subtotal.toLocaleString()}</span>
             </div>
+            {promoApplied && discount > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-green-400">Discount</span>
+                <span className="text-green-400">−{currency} {discount.toLocaleString()}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Service fee (5%)</span>
               <span className="text-gray-300">{currency} {serviceFee.toLocaleString()}</span>
@@ -195,20 +206,42 @@ function CheckoutContent() {
           <div className="flex gap-2">
             <input
               value={promoCode}
-              onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoApplied(false) }}
+              onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoApplied(false); setPromoError('') }}
               placeholder="EARLY20"
               className="flex-1 bg-surface-800 border border-surface-600 rounded-2xl px-4 py-3.5 text-white placeholder:text-gray-600 focus:outline-none focus:border-brand-500 text-sm transition-colors font-mono"
             />
             <button
-              onClick={() => setPromoApplied(true)}
-              disabled={!promoCode}
+              onClick={async () => {
+                if (!promoCode) return
+                setPromoLoading(true)
+                setPromoError('')
+                try {
+                  const { data } = await api.get(`/events/${eventId}/promo/validate`, { params: { code: promoCode } })
+                  const promo = data.data as { discount_type: string; discount_value: number; valid: boolean }
+                  let calculated = 0
+                  if (promo.discount_type === 'percent') {
+                    calculated = Math.floor(subtotal * promo.discount_value / 100)
+                  } else {
+                    calculated = Math.min(promo.discount_value, subtotal)
+                  }
+                  setPromoDiscount(calculated)
+                  setPromoApplied(true)
+                } catch (err: unknown) {
+                  const e = err as { response?: { data?: { error?: string } } }
+                  setPromoError(e?.response?.data?.error ?? 'Invalid promo code')
+                } finally {
+                  setPromoLoading(false)
+                }
+              }}
+              disabled={!promoCode || promoLoading}
               className="px-4 bg-surface-700 border border-surface-500 rounded-2xl text-sm font-semibold text-white disabled:opacity-40 flex items-center gap-1.5"
             >
-              <Tag className="w-3.5 h-3.5" />
+              {promoLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Tag className="w-3.5 h-3.5" />}
               Apply
             </button>
           </div>
-          {promoApplied && <p className="text-xs text-green-400 mt-1.5">Code applied — discount calculated at payment</p>}
+          {promoApplied && <p className="text-xs text-green-400 mt-1.5">Code applied — {currency} {promoDiscount.toLocaleString()} off</p>}
+          {promoError && <p className="text-xs text-red-400 mt-1.5">{promoError}</p>}
         </div>
 
         {error && (

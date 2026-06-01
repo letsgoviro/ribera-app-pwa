@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { db } from '../lib/db'
 import { requireAuth, requireOrganiser } from '../middleware/auth'
+import { sendEventCancellation } from '../services/email'
 
 const createEventSchema = z.object({
   title: z.string().min(3).max(100),
@@ -200,6 +201,33 @@ export async function eventsRoutes(app: FastifyInstance) {
     return reply.send({ data: event })
   })
 
+  // GET /api/v1/events/:id/promo/validate?code=XXXXX — validate promo code and return discount
+  app.get('/:id/promo/validate', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const { code } = req.query as { code?: string }
+    if (!code) return reply.code(400).send({ error: 'code required' })
+
+    const promo = await db.promoCode.findUnique({
+      where: { event_id_code: { event_id: id, code: code.toUpperCase() } },
+    })
+
+    if (!promo) return reply.code(404).send({ error: 'Invalid promo code' })
+    if (promo.expires_at && promo.expires_at < new Date()) return reply.code(400).send({ error: 'Promo code has expired' })
+    if (promo.max_uses && promo.used_count >= promo.max_uses) return reply.code(400).send({ error: 'Promo code has been fully redeemed' })
+
+    return reply.send({ data: { discount_type: promo.discount_type, discount_value: Number(promo.discount_value), valid: true } })
+  })
+
+  // POST /api/v1/events/:id/waitlist
+  app.post('/:id/waitlist', { preHandler: requireAuth }, async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const { tier_id } = req.body as { tier_id: string }
+    // For now, just acknowledge — in production this would save to a waitlist table
+    // and notify when tickets become available via a background job
+    console.log(`Waitlist: user ${req.user!.id} wants tier ${tier_id} for event ${id}`)
+    return reply.send({ data: { joined: true, message: "We'll notify you if tickets become available." } })
+  })
+
   // POST /api/v1/events/:id/publish
   app.post('/:id/publish', { preHandler: requireOrganiser }, async (req, reply) => {
     const { id } = req.params as { id: string }
@@ -230,6 +258,29 @@ export async function eventsRoutes(app: FastifyInstance) {
       where: { id },
       data: { status: 'cancelled', cancelled_at: new Date() },
     })
+
+    // Notify all ticket holders non-blocking
+    const affectedTickets = await db.ticket.findMany({
+      where: { event_id: id, status: { in: ['valid', 'used'] } },
+      include: { order: { select: { attendee_name: true, attendee_email: true, total: true, currency: true } } },
+      distinct: ['order_id'],
+    })
+    const eventFull = await db.event.findUnique({ where: { id }, select: { title: true, starts_at: true } })
+
+    if (eventFull && affectedTickets.length > 0) {
+      Promise.allSettled(
+        affectedTickets.map(t =>
+          sendEventCancellation({
+            email: t.order.attendee_email,
+            name: t.order.attendee_name,
+            eventTitle: eventFull.title,
+            eventDate: eventFull.starts_at.toLocaleDateString('en-TZ', { dateStyle: 'long' }),
+            refundAmount: Number(t.order.total).toLocaleString(),
+            currency: t.order.currency,
+          })
+        )
+      ).catch(console.error)
+    }
 
     return reply.code(204).send()
   })

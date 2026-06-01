@@ -55,6 +55,8 @@ export async function organiserRoutes(app: FastifyInstance) {
       org_name: z.string().min(2).optional(),
       bio: z.string().optional(),
       website: z.string().url().optional().or(z.literal('')),
+      banner_url: z.string().url().nullable().optional(),
+      social_links: z.record(z.string()).optional(),
     }).parse(req.body)
     const organiser = await db.organiser.findUnique({ where: { user_id: req.user!.id } })
     if (!organiser) return reply.code(404).send({ error: 'Not found' })
@@ -64,6 +66,8 @@ export async function organiserRoutes(app: FastifyInstance) {
         ...(body.org_name && { org_name: body.org_name }),
         bio: body.bio ?? organiser.bio,
         website: body.website || organiser.website,
+        ...(body.banner_url !== undefined && { banner_url: body.banner_url }),
+        ...(body.social_links !== undefined && { social_links: body.social_links }),
       },
     })
     return reply.send({ data: updated })
@@ -213,5 +217,40 @@ export async function organiserRoutes(app: FastifyInstance) {
       data: { organiser_id: organiser.id, amount: BigInt(amount), currency: 'TZS', method, account_details, status: 'pending' },
     })
     return reply.code(201).send({ data: payout })
+  })
+
+  // GET /api/v1/organiser/analytics/revenue — last 30 days daily revenue
+  app.get('/analytics/revenue', { preHandler: requireOrganiser }, async (req, reply) => {
+    const organiser = await db.organiser.findUnique({ where: { user_id: req.user!.id } })
+    if (!organiser) return reply.code(403).send({ error: 'Not an organiser' })
+
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+    const orders = await db.order.findMany({
+      where: {
+        event: { organiser_id: organiser.id },
+        status: 'paid',
+        paid_at: { gte: since },
+      },
+      select: { paid_at: true, total: true, service_fee: true },
+    })
+
+    // Group by day
+    const daily: Record<string, number> = {}
+    for (const order of orders) {
+      const day = order.paid_at!.toISOString().slice(0, 10)
+      daily[day] = (daily[day] ?? 0) + Number(order.total) - Number(order.service_fee)
+    }
+
+    // Fill in last 30 days including zero days
+    const result = []
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
+      const key = d.toISOString().slice(0, 10)
+      const label = d.toLocaleDateString('en-TZ', { month: 'short', day: 'numeric' })
+      result.push({ date: label, revenue: daily[key] ?? 0 })
+    }
+
+    return reply.send({ data: result })
   })
 }

@@ -7,7 +7,8 @@ import {
   ShieldCheck, Calendar, Zap,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
-import { supabase } from '@/lib/api'
+import { supabase, api } from '@/lib/api'
+import { useQuery } from '@tanstack/react-query'
 
 const NAV = [
   { href: '/', icon: LayoutDashboard, label: 'Overview' },
@@ -21,6 +22,12 @@ const NAV = [
 function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
+
+  const { data: pendingCount } = useQuery({
+    queryKey: ['admin-pending-orgs'],
+    queryFn: () => api.get('/admin/stats').then(r => r.data.data?.pending_verifications ?? 0),
+    refetchInterval: 30_000,
+  })
 
   const signOut = async () => {
     await supabase.auth.signOut()
@@ -51,7 +58,12 @@ function Sidebar() {
               }`}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
-              {label}
+              <span className="flex-1">{label}</span>
+              {href === '/organisers' && pendingCount > 0 && (
+                <span className="bg-red-500 text-white text-xs font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
+                  {pendingCount > 9 ? '9+' : pendingCount}
+                </span>
+              )}
             </Link>
           )
         })}

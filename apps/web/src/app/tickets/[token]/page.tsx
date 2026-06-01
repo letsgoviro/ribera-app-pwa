@@ -200,7 +200,7 @@ export default function TicketSharePage({ params }: { params: Promise<{ token: s
           className="w-full flex items-center justify-center gap-2 bg-brand-500 text-white rounded-2xl py-3.5 font-bold active:scale-[0.98] transition-transform"
         >
           <Download className="w-4 h-4" />
-          Download Ticket
+          Download Ticket as Image
         </button>
         <button
           onClick={handleShare}

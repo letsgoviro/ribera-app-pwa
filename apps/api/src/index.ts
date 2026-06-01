@@ -18,6 +18,7 @@ import { adminRoutes } from './routes/admin'
 import { webhookRoutes } from './routes/webhooks'
 import { authRoutes } from './routes/auth'
 import { uploadsRoutes } from './routes/uploads'
+import { reviewsRoutes } from './routes/reviews'
 
 // BigInt → Number so JSON.stringify never throws "Do not know how to serialize a BigInt"
 ;(BigInt.prototype as unknown as Record<string, unknown>)['toJSON'] = function () {
@@ -77,6 +78,7 @@ async function bootstrap() {
   await app.register(adminRoutes, { prefix: '/api/v1/admin' })
   await app.register(uploadsRoutes, { prefix: '/api/v1/uploads' })
   await app.register(webhookRoutes, { prefix: '/api/v1/webhooks' })
+  await app.register(reviewsRoutes, { prefix: '/api/v1/reviews' })
 
   await app.listen({ port: PORT, host: '0.0.0.0' })
   console.log(`Ribera API running on port ${PORT}`)

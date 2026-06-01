@@ -74,7 +74,7 @@ function AuthPageInner() {
     if (!target) { setError('Enter your email address above'); return }
     setLoading(true); setError('')
     const { error } = await supabase.auth.resetPasswordForEmail(target, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/profile`,
+      redirectTo: `${window.location.origin}/auth/reset-password`,
     })
     setLoading(false)
     if (error) { setError(error.message); return }

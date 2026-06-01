@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase'
 import type { Event, ApiResponse } from '@ribera/types'
 import {
   Calendar, MapPin, ChevronLeft, Share2, ExternalLink,
-  Users, ShieldCheck, Minus, Plus, Ticket, Tag, Lock, Hash, Link2
+  Users, ShieldCheck, Minus, Plus, Ticket, Tag, Lock, Hash, Link2, Images, Bell
 } from 'lucide-react'
 
 interface PageProps {
@@ -22,6 +22,7 @@ export default function EventDetailPage({ params }: PageProps) {
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [showFullDesc, setShowFullDesc] = useState(false)
   const [stickyVisible, setStickyVisible] = useState(false)
+  const [waitlistJoined, setWaitlistJoined] = useState<Set<string>>(new Set())
   const heroRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -72,6 +73,20 @@ export default function EventDetailPage({ params }: PageProps) {
       items: JSON.stringify(items),
     })
     router.push(`/checkout?${params}`)
+  }
+
+  const handleWaitlist = async (tierId: string) => {
+    const { data: session } = await supabase.auth.getSession()
+    if (!session.session) {
+      router.push(`/auth?next=/events/${event!.slug}`)
+      return
+    }
+    try {
+      await api.post(`/events/${event!.id}/waitlist`, { tier_id: tierId })
+      setWaitlistJoined(prev => new Set([...prev, tierId]))
+    } catch { /* already on waitlist is fine */
+      setWaitlistJoined(prev => new Set([...prev, tierId]))
+    }
   }
 
   const handleShare = async () => {
@@ -292,6 +307,23 @@ export default function EventDetailPage({ params }: PageProps) {
           </div>
         )}
 
+        {/* Gallery */}
+        {(event as unknown as Record<string, unknown>).gallery_urls && ((event as unknown as Record<string, string[]>).gallery_urls).length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-white font-bold mb-3 flex items-center gap-2">
+              <Images className="w-4 h-4 text-brand-500" />
+              Photos
+            </h2>
+            <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1 -mx-4 px-4">
+              {((event as unknown as Record<string, string[]>).gallery_urls).map((url, i) => (
+                <div key={i} className="flex-shrink-0 w-52 h-36 rounded-2xl overflow-hidden bg-surface-800">
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Ticket Tiers */}
         <h2 className="text-white font-bold mb-3 flex items-center gap-2">
           <Ticket className="w-4 h-4 text-brand-500" />
@@ -366,9 +398,11 @@ export default function EventDetailPage({ params }: PageProps) {
                   </div>
 
                   {soldOut ? (
-                    <span className="text-xs text-red-400 font-semibold bg-red-500/10 px-3 py-1.5 rounded-full mt-1 flex-shrink-0">
-                      Sold out
-                    </span>
+                    <div className="flex flex-col items-end mt-1 flex-shrink-0">
+                      <span className="text-xs text-red-400 font-semibold bg-red-500/10 px-3 py-1.5 rounded-full">
+                        Sold out
+                      </span>
+                    </div>
                   ) : (
                     <div className="flex items-center gap-3 mt-1 flex-shrink-0">
                       <button
@@ -389,6 +423,19 @@ export default function EventDetailPage({ params }: PageProps) {
                     </div>
                   )}
                 </div>
+
+                {soldOut && (
+                  <button
+                    onClick={() => handleWaitlist(tier.id)}
+                    className="mt-2 w-full text-xs text-brand-500 font-semibold bg-brand-500/10 border border-brand-500/20 rounded-xl py-2 flex items-center justify-center gap-1.5"
+                  >
+                    {waitlistJoined.has(tier.id) ? (
+                      '✓ You\'re on the waitlist'
+                    ) : (
+                      <><Bell className="w-3 h-3" /> Notify me if tickets become available</>
+                    )}
+                  </button>
+                )}
               </div>
             )
           })}

@@ -8,6 +8,7 @@ import { UpcomingEvents } from '@/components/dashboard/UpcomingEvents'
 import { CalendarPlus, ScanLine, Wallet, CalendarDays, Ticket, TrendingUp, Users, Zap, DollarSign, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface DashboardStats {
   total_events: number
@@ -41,6 +42,11 @@ export default function DashboardPage() {
     queryKey: ['organiser-dashboard'],
     queryFn: () => api.get('/organiser/dashboard').then((r) => r.data),
     refetchInterval: 60_000,
+  })
+
+  const { data: chartData } = useQuery({
+    queryKey: ['organiser-revenue-chart'],
+    queryFn: () => api.get('/organiser/analytics/revenue').then(r => r.data.data ?? []),
   })
 
   const stats = data?.data
@@ -185,6 +191,28 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Revenue chart — last 30 days */}
+      {chartData && chartData.length > 0 && (
+        <div className="bg-surface-800 border border-surface-600 rounded-2xl p-5 mb-6">
+          <p className="text-sm font-bold text-white mb-4">Revenue — last 30 days</p>
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#0066FF" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#0066FF" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e1e30" />
+              <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: 10 }} tickLine={false} />
+              <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
+              <Tooltip contentStyle={{ background: '#141420', border: '1px solid #1e1e30', borderRadius: 8 }} labelStyle={{ color: '#9090aa', fontSize: 11 }} formatter={(v: number) => [`TZS ${v.toLocaleString()}`, 'Revenue']} />
+              <Area type="monotone" dataKey="revenue" stroke="#0066FF" strokeWidth={2} fill="url(#rev)" dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Upcoming events */}
       <UpcomingEvents events={stats?.upcoming_events ?? []} loading={isLoading} />

@@ -7,7 +7,7 @@ import { EVENT_CATEGORIES } from '@ribera/config'
 import { EventCard } from '@/components/events/EventCard'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { motion } from 'framer-motion'
-import { Search, SlidersHorizontal } from 'lucide-react'
+import { Search, SlidersHorizontal, MapPin } from 'lucide-react'
 import { useState } from 'react'
 
 export default function DiscoverPage() {
@@ -35,13 +35,24 @@ export default function DiscoverPage() {
       <header className="px-4 pt-6 pb-4">
         <div className="flex items-center justify-between mb-5">
           <h1 className="text-2xl font-black text-white">Discover</h1>
-          <button
-            onClick={() => setSortBy((s) => (s === 'date' ? 'popular' : 'date'))}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-800 border border-surface-600 rounded-full text-xs font-semibold text-gray-300"
-          >
-            <SlidersHorizontal className="w-3 h-3" />
-            {sortBy === 'date' ? 'By date' : 'Popular'}
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href={`https://www.google.com/maps/search/events+${encodeURIComponent(category ? EVENT_CATEGORIES.find(c => c.id === category)?.label ?? '' : '')}+Tanzania/@-6.7924,39.2083,12z`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-800 border border-surface-600 rounded-full text-xs font-semibold text-gray-300"
+            >
+              <MapPin className="w-3 h-3" />
+              Map
+            </a>
+            <button
+              onClick={() => setSortBy((s) => (s === 'date' ? 'popular' : 'date'))}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-800 border border-surface-600 rounded-full text-xs font-semibold text-gray-300"
+            >
+              <SlidersHorizontal className="w-3 h-3" />
+              {sortBy === 'date' ? 'By date' : 'Popular'}
+            </button>
+          </div>
         </div>
 
         {/* Search bar */}
