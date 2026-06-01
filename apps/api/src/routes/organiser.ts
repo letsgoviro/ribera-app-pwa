@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { db } from '../lib/db'
 import { requireOrganiser, requireAuth } from '../middleware/auth'
+import { sendOrganiserWelcome } from '../services/email'
 
 const applySchema = z.object({
   org_name: z.string().min(2),
@@ -21,12 +22,34 @@ const applySchema = z.object({
 })
 
 export async function organiserRoutes(app: FastifyInstance) {
-  // POST /api/v1/organiser/apply
+  // POST /api/v1/organiser/apply — AUTO-APPROVES immediately (no admin wait)
   app.post('/apply', { preHandler: requireAuth }, async (req, reply) => {
     const body = applySchema.parse(req.body)
     const existing = await db.organiser.findUnique({ where: { user_id: req.user!.id } })
-    if (existing) return reply.code(409).send({ error: 'Already applied' })
+    if (existing) {
+      // Already applied — if already verified return their record
+      if (existing.verified) return reply.send({ data: existing })
+      return reply.code(409).send({ error: 'Application already submitted' })
+    }
 
+    // ── Ensure profile exists (FK requirement) + set role to 'organiser' ────
+    // Some users (e.g., just signed up) may not have a profile row yet
+    await db.profile.upsert({
+      where: { id: req.user!.id },
+      create: {
+        id: req.user!.id,
+        display_name: body.full_name ?? null,
+        phone: body.phone ?? null,
+        role: 'organiser',
+      },
+      update: {
+        role: 'organiser',
+        ...(body.full_name ? { display_name: body.full_name } : {}),
+        ...(body.phone ? { phone: body.phone } : {}),
+      },
+    })
+
+    // ── Auto-approve: create organiser as verified immediately ──────────────
     const organiser = await db.organiser.create({
       data: {
         user_id: req.user!.id,
@@ -37,9 +60,28 @@ export async function organiserRoutes(app: FastifyInstance) {
         id_doc_url: body.id_doc_url,
         phone: body.phone,
         payout_details: body.payout_details ?? {},
+        verified: true,           // auto-approved — no admin wait
+        verified_at: new Date(),
       },
     })
-    return reply.code(201).send({ data: organiser })
+
+    const { supabase } = await import('../lib/supabase')
+    await supabase.auth.admin.updateUserById(req.user!.id, {
+      user_metadata: { role: 'organiser' },
+    }).catch(e => req.log.warn('Failed to update Supabase role:', e.message))
+
+    // ── Send welcome email (non-blocking) ───────────────────────────────────
+    const { data: authUser } = await supabase.auth.admin.getUserById(req.user!.id)
+    const email = authUser.user?.email
+    if (email) {
+      sendOrganiserWelcome({
+        email,
+        name: body.full_name ?? body.org_name,
+        orgName: body.org_name,
+      }).catch(e => req.log.warn('Welcome email failed:', e.message))
+    }
+
+    return reply.code(201).send({ data: { ...organiser, auto_approved: true } })
   })
 
   // GET /api/v1/organiser/me

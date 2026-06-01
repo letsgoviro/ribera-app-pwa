@@ -23,12 +23,34 @@ const createOrderSchema = z.object({
   currency: z.string().length(3).default('TZS'),
   redirect_url: z.string().url().optional(),
   back_url: z.string().url().optional(),
+  idempotency_key: z.string().uuid().optional(),
 })
 
 export async function ordersRoutes(app: FastifyInstance) {
   // POST /api/v1/orders — create order and get DPO payment link
-  app.post('/', { preHandler: requireAuth }, async (req, reply) => {
+  app.post('/', { preHandler: requireAuth, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const body = createOrderSchema.parse(req.body)
+
+    // Idempotency: if key provided, check for existing order
+    if (body.idempotency_key) {
+      const existing = await db.order.findFirst({
+        where: {
+          user_id: req.user!.id,
+          custom_fields: { path: ['idempotency_key'], equals: body.idempotency_key }
+        }
+      })
+      if (existing) {
+        req.log.info({ orderId: existing.id }, 'Idempotent order return')
+        if (existing.status === 'paid') {
+          return reply.code(200).send({ data: { order_id: existing.id, free: true } })
+        }
+        // Re-fetch payment URL if still pending
+        if (existing.dpo_token) {
+          const paymentUrl = `${process.env['DPO_PAYMENT_URL'] ?? 'https://secure.3gdirectpay.com/payv2.php'}?ID=${existing.dpo_token}`
+          return reply.code(200).send({ data: { order_id: existing.id, payment_url: paymentUrl, total: Number(existing.total), currency: existing.currency } })
+        }
+      }
+    }
 
     // Validate tiers and calculate totals
     const tiers = await db.ticketTier.findMany({
@@ -95,7 +117,9 @@ export async function ordersRoutes(app: FastifyInstance) {
         attendee_name: body.attendee_name,
         attendee_email: body.attendee_email,
         attendee_phone: body.attendee_phone,
-        custom_fields: body.custom_fields,
+        custom_fields: body.idempotency_key
+          ? { ...body.custom_fields, idempotency_key: body.idempotency_key }
+          : body.custom_fields,
         reserved_until: reservedUntil,
       },
     })

@@ -63,30 +63,47 @@ function QRCanvas({ token }: { token: string }) {
 function TicketCard({ ticket, onView }: { ticket: Ticket; onView: (t: Ticket) => void }) {
   const isUsed = ticket.status === 'used'
   const isCancelled = ticket.status === 'cancelled'
+  const isValid = !isUsed && !isCancelled
+
+  const tierTypeLabel = ticket.tier?.tier_type && ticket.tier.tier_type !== 'general'
+    ? ticket.tier.tier_type === 'vip' ? '⭐ VIP'
+      : ticket.tier.tier_type === 'table' ? `🪑 Table for ${ticket.tier.seats_per_unit ?? 8}`
+      : ticket.tier.tier_type === 'seat' ? '💺 Reserved'
+      : ticket.tier.tier_type === 'standing' ? '🕺 Standing'
+      : ticket.tier.tier_type === 'online' ? '📲 Virtual'
+      : null
+    : null
 
   return (
     <motion.div
       layout
       variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
-      transition={{ duration: 0.2 }}
-      className={`bg-surface-800 border rounded-3xl overflow-hidden transition-all ${
-        isCancelled ? 'border-surface-600 opacity-60' : isUsed ? 'border-surface-600 opacity-70 active:scale-[0.98]' : 'border-surface-600 active:scale-[0.98]'
+      transition={{ duration: 0.22 }}
+      className={`relative rounded-3xl overflow-hidden border transition-all cursor-pointer ${
+        isCancelled
+          ? 'bg-surface-800 border-surface-600 opacity-50'
+          : isUsed
+          ? 'bg-surface-800 border-surface-600 opacity-65 active:scale-[0.98]'
+          : 'bg-surface-800 border-surface-600 active:scale-[0.98] shadow-lg shadow-green-500/10 hover:shadow-green-500/20 hover:border-green-500/30'
       }`}
       onClick={() => !isCancelled && onView(ticket)}
     >
-      {/* Ticket header */}
-      <div className="relative h-28 bg-surface-700">
+      {/* Cover image */}
+      <div className="relative h-32 bg-surface-700 overflow-hidden">
         {ticket.event?.cover_image_url ? (
           <img src={ticket.event.cover_image_url} alt="" className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-5xl">🎉</div>
+          <div className="w-full h-full flex items-center justify-center text-5xl bg-gradient-to-br from-brand-500/20 to-purple-600/20">
+            🎉
+          </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-surface-800 to-transparent" />
+        {/* Gradient fade into ticket body */}
+        <div className="absolute inset-0 bg-gradient-to-t from-surface-800 via-surface-800/30 to-transparent" />
 
         {/* Status badge */}
         <div className="absolute top-3 right-3">
           {isUsed ? (
-            <span className="bg-gray-500/80 text-white text-xs font-bold px-2.5 py-1 rounded-full backdrop-blur-sm flex items-center gap-1">
+            <span className="bg-gray-600/80 text-gray-300 text-xs font-bold px-2.5 py-1 rounded-full backdrop-blur-sm flex items-center gap-1">
               <CheckCircle className="w-3 h-3" /> Used
             </span>
           ) : isCancelled ? (
@@ -94,59 +111,101 @@ function TicketCard({ ticket, onView }: { ticket: Ticket; onView: (t: Ticket) =>
               <XCircle className="w-3 h-3" /> Cancelled
             </span>
           ) : (
-            <span className="bg-green-500/80 text-white text-xs font-bold px-2.5 py-1 rounded-full backdrop-blur-sm flex items-center gap-1">
+            <span className="bg-green-500/85 text-white text-xs font-bold px-2.5 py-1 rounded-full backdrop-blur-sm flex items-center gap-1 shadow-sm shadow-green-500/30">
               <QrCode className="w-3 h-3" /> Valid
             </span>
           )}
         </div>
-      </div>
 
-      {/* Perforated line */}
-      <div className="relative flex items-center">
-        <div className="w-5 h-5 rounded-full bg-surface-900 -ml-2.5 flex-shrink-0 border-r border-surface-600" />
-        <div className="flex-1 border-t border-dashed border-surface-600" />
-        <div className="w-5 h-5 rounded-full bg-surface-900 -mr-2.5 flex-shrink-0 border-l border-surface-600" />
-      </div>
-
-      {/* Ticket info */}
-      <div className="p-4">
-        <p className="font-black text-white text-base leading-tight mb-1 line-clamp-2">{ticket.event?.title}</p>
-        <div className="flex items-center gap-2 mb-3">
-          <p className="text-brand-500 font-semibold text-sm">{ticket.tier?.name}</p>
-          {ticket.tier?.tier_type && ticket.tier.tier_type !== 'general' && (
-            <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-surface-700 text-gray-400">
-              {ticket.tier.tier_type === 'vip' ? '⭐ VIP'
-                : ticket.tier.tier_type === 'table' ? `🪑 Table for ${ticket.tier.seats_per_unit ?? 8}`
-                : ticket.tier.tier_type === 'seat' ? '💺 Reserved'
-                : ticket.tier.tier_type === 'standing' ? '🕺 Standing'
-                : ticket.tier.tier_type === 'online' ? '📲 Virtual'
-                : null}
+        {/* Tier badge on cover — premium pill */}
+        {tierTypeLabel && (
+          <div className="absolute bottom-3 left-3">
+            <span className="bg-black/60 backdrop-blur-sm text-white/90 text-[11px] font-bold px-2.5 py-1 rounded-full border border-white/10">
+              {tierTypeLabel}
             </span>
-          )}
+          </div>
+        )}
+      </div>
+
+      {/* Physical ticket perforation line */}
+      <div className="relative flex items-center px-0">
+        {/* Left notch */}
+        <div
+          className="absolute left-0 w-6 h-6 rounded-full bg-surface-900 border-r border-dashed border-surface-600"
+          style={{ transform: 'translateX(-50%)' }}
+        />
+        {/* Dashed line */}
+        <div className="w-full border-t-2 border-dashed border-surface-600/60 mx-6" />
+        {/* Right notch */}
+        <div
+          className="absolute right-0 w-6 h-6 rounded-full bg-surface-900 border-l border-dashed border-surface-600"
+          style={{ transform: 'translateX(50%)' }}
+        />
+      </div>
+
+      {/* Ticket body */}
+      <div className="px-4 pt-3.5 pb-4">
+        {/* Tier name */}
+        <div className="flex items-center gap-2 mb-2">
+          <span className={`text-xs font-black px-2.5 py-1 rounded-full border ${
+            ticket.tier?.tier_type === 'vip'
+              ? 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'
+              : 'bg-brand-500/15 text-brand-500 border-brand-500/30'
+          }`}>
+            {ticket.tier?.name ?? 'General Admission'}
+          </span>
         </div>
 
-        <div className="space-y-1.5">
+        {/* Event title */}
+        <p className="font-black text-white text-lg leading-tight mb-3 line-clamp-2 tracking-tight">
+          {ticket.event?.title}
+        </p>
+
+        <div className="space-y-2">
           {ticket.event?.starts_at && (
-            <div className="flex items-center gap-2 text-gray-500 text-xs">
-              <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-              {new Date(ticket.event.starts_at).toLocaleDateString('en-TZ', {
-                weekday: 'short', month: 'short', day: 'numeric',
-                hour: '2-digit', minute: '2-digit',
-              })}
+            <div className="flex items-center gap-2 text-gray-400 text-xs">
+              <Calendar className="w-3.5 h-3.5 flex-shrink-0 text-brand-500" />
+              <span>
+                {new Date(ticket.event.starts_at).toLocaleDateString('en-TZ', {
+                  weekday: 'short', month: 'short', day: 'numeric',
+                  hour: '2-digit', minute: '2-digit',
+                })}
+              </span>
             </div>
           )}
           {ticket.event?.venue_name && (
-            <div className="flex items-center gap-2 text-gray-500 text-xs">
-              <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-              {ticket.event.venue_name}
+            <div className="flex items-center gap-2 text-gray-400 text-xs">
+              <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-brand-500" />
+              <span className="line-clamp-1">{ticket.event.venue_name}</span>
             </div>
           )}
         </div>
 
-        {!isUsed && !isCancelled && (
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-xs text-gray-600">Tap to show QR code</span>
-            <QrCode className="w-4 h-4 text-gray-600" />
+        {/* Footer hint */}
+        {isValid && (
+          <div className="mt-3.5 flex items-center justify-between border-t border-surface-600 pt-3">
+            <span className="text-xs text-gray-500 font-medium">Tap to show QR code</span>
+            <div className="flex items-center gap-1.5">
+              {/* Mini QR dot-pattern placeholder */}
+              <div className="grid grid-cols-4 gap-0.5 opacity-50">
+                {Array.from({ length: 16 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-1 h-1 rounded-[1px] ${
+                      [0,1,3,4,7,8,10,12,15].includes(i) ? 'bg-gray-400' : 'bg-surface-600'
+                    }`}
+                  />
+                ))}
+              </div>
+              <QrCode className="w-4 h-4 text-gray-500" />
+            </div>
+          </div>
+        )}
+
+        {isUsed && (
+          <div className="mt-3 flex items-center gap-2 text-gray-500 text-xs border-t border-surface-600 pt-3">
+            <CheckCircle className="w-3.5 h-3.5 text-gray-600" />
+            Scanned at entrance
           </div>
         )}
       </div>

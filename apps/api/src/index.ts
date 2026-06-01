@@ -80,8 +80,24 @@ async function bootstrap() {
   await app.register(webhookRoutes, { prefix: '/api/v1/webhooks' })
   await app.register(reviewsRoutes, { prefix: '/api/v1/reviews' })
 
+  await runStartupMigrations()
   await app.listen({ port: PORT, host: '0.0.0.0' })
   console.log(`Ribera API running on port ${PORT}`)
+}
+
+// Run once at startup — create tables that are outside Prisma schema
+async function runStartupMigrations() {
+  await db.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS reviews (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES profiles(id),
+      event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+      rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+      comment TEXT,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      UNIQUE(user_id, event_id)
+    )
+  `).catch(e => console.error('Migration warning (reviews table):', (e as Error).message))
 }
 
 bootstrap().catch((err) => {

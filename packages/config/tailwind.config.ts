@@ -24,6 +24,21 @@ export const ribera_tailwind_preset: Partial<Config> = {
           600: '#d4891a',
           700: '#a36c14',
         },
+        // Landing page accent palette (from ribera-app-web)
+        coral: {
+          400: '#ff7080',
+          500: '#FF4B5C', // landing primary CTA
+          600: '#e63342',
+        },
+        teal: {
+          400: '#22d8eb',
+          500: '#00C1D4', // landing secondary
+          600: '#009aab',
+        },
+        violet: {
+          500: '#7D2AE8', // landing tertiary/gradient
+          600: '#6520c0',
+        },
         surface: {
           900: '#0A0A0F', // page background
           800: '#141420', // card background

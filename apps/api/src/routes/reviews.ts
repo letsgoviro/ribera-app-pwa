@@ -15,19 +15,6 @@ export async function reviewsRoutes(app: FastifyInstance) {
     })
     if (!ticket) return reply.code(403).send({ error: 'You must attend the event to review it' })
 
-    // Create table and upsert
-    await db.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS reviews (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID NOT NULL REFERENCES profiles(id),
-        event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-        rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
-        comment TEXT,
-        created_at TIMESTAMPTZ DEFAULT now(),
-        UNIQUE(user_id, event_id)
-      )
-    `)
-
     await db.$executeRawUnsafe(
       `INSERT INTO reviews (user_id, event_id, rating, comment) VALUES ($1, $2, $3, $4)
        ON CONFLICT (user_id, event_id) DO UPDATE SET rating = $3, comment = $4`,

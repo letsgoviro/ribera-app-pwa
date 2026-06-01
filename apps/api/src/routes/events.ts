@@ -125,11 +125,11 @@ export async function eventsRoutes(app: FastifyInstance) {
     return reply.send({ data: event })
   })
 
-  // POST /api/v1/events — organiser only
+  // POST /api/v1/events — organiser only (auto-approved on signup — no verified gate)
   app.post('/', { preHandler: requireOrganiser }, async (req, reply) => {
     const body = createEventSchema.parse(req.body)
     const organiser = await db.organiser.findUnique({ where: { user_id: req.user!.id } })
-    if (!organiser?.verified) return reply.code(403).send({ error: 'Organiser not verified' })
+    if (!organiser) return reply.code(403).send({ error: 'Organiser profile not found' })
 
     const slug = slugify(body.title)
 
@@ -232,7 +232,7 @@ export async function eventsRoutes(app: FastifyInstance) {
   app.post('/:id/publish', { preHandler: requireOrganiser }, async (req, reply) => {
     const { id } = req.params as { id: string }
     const organiser = await db.organiser.findUnique({ where: { user_id: req.user!.id } })
-    if (!organiser?.verified) return reply.code(403).send({ error: 'Organiser not verified' })
+    if (!organiser) return reply.code(403).send({ error: 'Organiser profile not found' })
 
     const existing = await db.event.findFirst({ where: { id, organiser_id: organiser.id } })
     if (!existing) return reply.code(404).send({ error: 'Event not found' })

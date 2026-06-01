@@ -12,9 +12,9 @@ import { api } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 
 const BENEFITS = [
-  { icon: Percent, title: '0% Commission', desc: 'Keep every shilling from ticket sales. No listing fees.', color: 'text-green-400', bg: 'bg-green-500/15' },
-  { icon: Zap, title: 'Instant Setup', desc: 'Create and publish your first event in under 5 minutes.', color: 'text-yellow-400', bg: 'bg-yellow-500/15' },
-  { icon: Shield, title: 'Verified Badge', desc: 'Get a verified organiser badge displayed on all your events.', color: 'text-brand-500', bg: 'bg-brand-500/15' },
+  { icon: Percent, title: '0% Commission, Forever', desc: 'Keep 100% of your ticket revenue. No hidden fees, no monthly plans.', color: 'text-green-400', bg: 'bg-green-500/15' },
+  { icon: Zap, title: 'Approved Instantly', desc: 'No waiting. Your account activates the moment you submit — create events right away.', color: 'text-yellow-400', bg: 'bg-yellow-500/15' },
+  { icon: Shield, title: 'Accept Cards & Mobile Money', desc: 'Visa, Mastercard, M-Pesa, Airtel Money, MTN MoMo — buyers pay any way they like.', color: 'text-brand-500', bg: 'bg-brand-500/15' },
 ]
 
 type Step = 'landing' | 'form' | 'success' | 'already_applied'
@@ -93,6 +93,8 @@ export default function BecomeOrganiserPage() {
         payout_details: payoutDetails,
       })
 
+      // Refresh the Supabase session so the JWT gets the new 'organiser' role
+      await supabase.auth.refreshSession()
       setStep('success')
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } }; message?: string }
@@ -116,43 +118,68 @@ export default function BecomeOrganiserPage() {
     )
   }
 
-  // ── Success ──────────────────────────────────────────────────────────
+  // ── Success — instant approval ───────────────────────────────────────
   if (step === 'success') {
     return (
       <div className="min-h-dvh bg-surface-900 flex flex-col items-center justify-center px-6 text-center pb-24">
         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', damping: 12 }}>
-          <div className="w-24 h-24 bg-green-500/15 rounded-full flex items-center justify-center mx-auto mb-6">
+          <div className="w-24 h-24 bg-green-500/15 rounded-full flex items-center justify-center mx-auto mb-6 relative">
             <CheckCircle2 className="w-12 h-12 text-green-400" />
+            {/* Glow ring */}
+            <div className="absolute inset-0 rounded-full border-2 border-green-500/30 animate-ping" />
           </div>
         </motion.div>
-        <h2 className="text-2xl font-black text-white mb-2">Application Submitted!</h2>
-        <p className="text-gray-400 text-sm leading-relaxed mb-8 max-w-xs">
-          We'll review your application within <strong className="text-white">24–48 hours</strong> and notify you by email.
-        </p>
-        <button
-          onClick={() => router.push('/')}
-          className="w-full max-w-xs bg-brand-500 text-white rounded-2xl py-4 font-bold"
-        >
-          Back to Home
-        </button>
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <div className="inline-flex items-center gap-1.5 bg-green-500/20 border border-green-500/30 text-green-400 text-xs font-bold px-3 py-1 rounded-full mb-4">
+            <Zap className="w-3 h-3" /> Instantly Approved
+          </div>
+          <h2 className="text-3xl font-black text-white mb-3">You're Live! 🎉</h2>
+          <p className="text-gray-400 text-sm leading-relaxed mb-3 max-w-xs">
+            Your organiser account is <strong className="text-green-400">active right now</strong>. No waiting, no review — start creating events immediately.
+          </p>
+          <p className="text-gray-600 text-xs mb-8">A welcome email is on its way to you.</p>
+          <div className="space-y-3 w-full max-w-xs">
+            <button
+              onClick={() => router.push('http://localhost:3002')}
+              className="w-full bg-gradient-to-r from-brand-500 to-violet-500 text-white rounded-2xl py-4 font-bold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+            >
+              <Zap className="w-5 h-5" />
+              Open Organiser Dashboard →
+            </button>
+            <button
+              onClick={() => router.push('/app')}
+              className="w-full bg-surface-800 border border-surface-600 text-gray-300 rounded-2xl py-3.5 font-semibold text-sm"
+            >
+              Back to Home
+            </button>
+          </div>
+        </motion.div>
       </div>
     )
   }
 
-  // ── Already applied ──────────────────────────────────────────────────
+  // ── Already approved — redirect to dashboard ─────────────────────────
   if (step === 'already_applied') {
     return (
       <div className="min-h-dvh bg-surface-900 flex flex-col items-center justify-center px-6 text-center pb-24">
         <div className="w-24 h-24 bg-brand-500/15 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Shield className="w-12 h-12 text-brand-500" />
+          <CheckCircle2 className="w-12 h-12 text-brand-500" />
         </div>
-        <h2 className="text-2xl font-black text-white mb-2">Already Applied</h2>
+        <h2 className="text-2xl font-black text-white mb-2">You're Already an Organiser!</h2>
         <p className="text-gray-400 text-sm leading-relaxed mb-8 max-w-xs">
-          You've already submitted an organiser application. We'll reach out once the review is complete.
+          Your organiser account is already active. Head to your dashboard to create or manage events.
         </p>
-        <button onClick={() => router.push('/')} className="w-full max-w-xs bg-brand-500 text-white rounded-2xl py-4 font-bold">
-          Back to Home
-        </button>
+        <div className="space-y-3 w-full max-w-xs">
+          <button
+            onClick={() => router.push('http://localhost:3002')}
+            className="w-full bg-brand-500 text-white rounded-2xl py-4 font-bold flex items-center justify-center gap-2"
+          >
+            <Zap className="w-4 h-4" /> Open Dashboard →
+          </button>
+          <button onClick={() => router.push('/app')} className="w-full bg-surface-800 border border-surface-600 text-gray-300 rounded-2xl py-3 font-semibold text-sm">
+            Back to Home
+          </button>
+        </div>
       </div>
     )
   }

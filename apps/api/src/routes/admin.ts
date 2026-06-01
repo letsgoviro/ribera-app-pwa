@@ -300,24 +300,37 @@ export async function adminRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string }
     const { status, reference, note } = req.body as { status: 'processing' | 'completed' | 'failed'; reference?: string; note?: string }
 
-    // Fetch current payout to prevent double-deduction
+    // Validate UUID format before hitting DB (prevents Prisma P2023 error)
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!UUID_RE.test(id)) return reply.code(404).send({ error: 'Payout not found' })
+
+    // Fetch payout info needed for balance deduction and email (before the atomic update)
     const existing = await db.payout.findUnique({
       where: { id },
       include: { organiser: { select: { id: true, org_name: true, user_id: true } } },
     })
     if (!existing) return reply.code(404).send({ error: 'Payout not found' })
-    const wasAlreadyCompleted = existing.status === 'completed'
 
-    const payout = await db.payout.update({
-      where: { id },
-      data: { status, reference, admin_note: note, processed_at: status === 'completed' ? new Date() : undefined },
+    // Atomic update — only succeeds if status isn't already completed
+    const updated = await db.payout.updateMany({
+      where: { id, status: { not: 'completed' } },
+      data: {
+        status,
+        ...(reference ? { reference } : {}),
+        ...(note ? { admin_note: note } : {}),
+        ...(status === 'completed' ? { processed_at: new Date() } : {}),
+      },
     })
 
-    // Deduct balance only on first completion (prevent double-deduction)
-    if (status === 'completed' && !wasAlreadyCompleted) {
+    if (updated.count === 0) {
+      return reply.code(409).send({ error: 'Payout already processed' })
+    }
+
+    // Deduct balance only on completion (atomic check above ensures it runs exactly once)
+    if (status === 'completed') {
       await db.organiser.update({
         where: { id: existing.organiser_id },
-        data: { balance: { decrement: payout.amount } },
+        data: { balance: { decrement: existing.amount } },
       })
 
       // Send email to organiser
@@ -327,13 +340,15 @@ export async function adminRoutes(app: FastifyInstance) {
           email: userEmail,
           name: existing.organiser.org_name,
           orgName: existing.organiser.org_name,
-          amount: Number(payout.amount),
-          currency: payout.currency,
-          reference: reference ?? payout.id,
+          amount: Number(existing.amount),
+          currency: existing.currency,
+          reference: reference ?? existing.id,
         }).catch(console.error)
       }
     }
 
+    // Fetch updated record to return
+    const payout = await db.payout.findUnique({ where: { id } })
     return reply.send({ data: payout })
   })
 

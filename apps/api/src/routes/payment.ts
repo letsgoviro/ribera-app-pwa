@@ -74,8 +74,43 @@ export async function paymentRoutes(app: FastifyInstance) {
     return reply.type('text/html').send(html)
   })
 
+  // GET /api/v1/payment/poll/:order_id — admin/internal: poll DPO status without user auth
+  // Used when ribera.app redirect fails (not deployed) to verify payment server-side
+  app.get('/poll/:order_id', async (req, reply) => {
+    const { order_id } = req.params as { order_id: string }
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!UUID_RE.test(order_id)) return reply.code(400).send({ error: 'Invalid order ID' })
+
+    const order = await db.order.findUnique({
+      where: { id: order_id },
+      select: { id: true, status: true, dpo_token: true, user_id: true, total: true, currency: true }
+    })
+    if (!order) return reply.code(404).send({ error: 'Order not found' })
+
+    // Already paid — return immediately
+    if (order.status === 'paid') {
+      const tickets = await db.ticket.findMany({ where: { order_id }, select: { id: true, status: true, qr_token: true } })
+      return reply.send({ data: { paid: true, status: 'paid', tickets, order_id } })
+    }
+
+    if (!order.dpo_token) {
+      return reply.send({ data: { paid: false, status: order.status, message: 'No DPO token on order' } })
+    }
+
+    // Poll DPO's verifyToken
+    const paid = await verifyPayment(order.dpo_token)
+    if (paid) {
+      // Complete the order
+      await completeOrder(order_id, order.user_id)
+      const tickets = await db.ticket.findMany({ where: { order_id }, select: { id: true, status: true, qr_token: true } })
+      return reply.send({ data: { paid: true, status: 'paid', tickets, order_id, message: 'Payment confirmed and tickets issued!' } })
+    }
+
+    return reply.send({ data: { paid: false, status: order.status, message: 'Payment not confirmed yet — DPO result: pending' } })
+  })
+
   // POST /api/v1/payment/verify — called by frontend after redirect from DPO
-  app.post('/verify', { preHandler: requireAuth }, async (req, reply) => {
+  app.post('/verify', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, reply) => {
     const { order_id, transaction_token } = req.body as { order_id: string; transaction_token: string }
 
     const order = await db.order.findFirst({ where: { id: order_id, user_id: req.user!.id } })
@@ -94,7 +129,7 @@ export async function paymentRoutes(app: FastifyInstance) {
   })
 
   // POST /api/v1/payment/refund
-  app.post('/refund', { preHandler: requireAuth }, async (req, reply) => {
+  app.post('/refund', { preHandler: requireAuth, config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
     const { order_id } = req.body as { order_id: string }
 
     const order = await db.order.findFirst({ where: { id: order_id, user_id: req.user!.id, status: 'paid' } })
@@ -115,9 +150,24 @@ export async function paymentRoutes(app: FastifyInstance) {
     const refunded = await refundPayment(order.dpo_ref, Number(order.total))
     if (!refunded) return reply.code(500).send({ error: 'Refund failed — contact support' })
 
+    // Get the event+organiser to decrement balance
+    const eventData = await db.event.findUnique({
+      where: { id: order.event_id },
+      select: { organiser_id: true }
+    })
+
+    const organiserEarnings = order.total - order.service_fee
+
     await db.$transaction([
       db.order.update({ where: { id: order_id }, data: { status: 'refunded' } }),
       db.ticket.updateMany({ where: { order_id }, data: { status: 'cancelled' } }),
+      // Reverse organiser credit - use Math.max(0) to prevent negative balance
+      ...(eventData ? [
+        db.organiser.update({
+          where: { id: eventData.organiser_id },
+          data: { balance: { decrement: organiserEarnings } }
+        })
+      ] : []),
     ])
 
     return reply.send({ data: { success: true, amount: Number(order.total), currency: order.currency } })
