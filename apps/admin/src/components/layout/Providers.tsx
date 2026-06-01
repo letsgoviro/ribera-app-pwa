@@ -14,6 +14,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [ready, setReady] = useState(false)
 
+  // One-time auth check on mount
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session && pathname !== '/login') {
@@ -25,9 +26,20 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
     const { data: listener } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') router.replace('/login')
+      if (event === 'SIGNED_IN') setReady(true)
     })
     return () => listener.subscription.unsubscribe()
-  }, [pathname, router])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Re-check session on each navigation to protected routes
+  useEffect(() => {
+    if (!ready) return
+    if (pathname === '/login') return
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) router.replace('/login')
+    })
+  }, [pathname, ready, router])
 
   if (!ready) {
     return (

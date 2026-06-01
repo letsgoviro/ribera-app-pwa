@@ -16,6 +16,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [ready, setReady] = useState(false)
 
+  // One-time initial auth check on mount
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
@@ -26,11 +27,25 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }
     })
 
+    // Sign-out listener only — we do NOT rely on authed state to avoid race conditions
     const { data: listener } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') router.replace('/login')
+      if (event === 'SIGNED_IN') setReady(true)
     })
     return () => listener.subscription.unsubscribe()
-  }, [pathname, router])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Guard protected routes on each navigation by re-checking session
+  useEffect(() => {
+    if (!ready) return
+    const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
+    if (isPublic) return
+    // Re-check session on every protected navigation to catch stale state
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) router.replace('/login')
+    })
+  }, [pathname, ready, router])
 
   if (!ready) {
     return (
