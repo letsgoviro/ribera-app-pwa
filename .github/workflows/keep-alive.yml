@@ -1,0 +1,85 @@
+name: Keep Supabase Alive
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Supabase free tier pauses the database after 7 days of inactivity.
+# This workflow runs every 3 days and makes a lightweight query to the DB
+# so it never reaches the 7-day idle threshold.
+#
+# Cost: $0 — GitHub Actions free tier gives 2,000 min/month (public repos)
+#             Each run takes ~15 seconds → ~2 minutes/month total.
+#
+# When you migrate to DO Managed PostgreSQL, disable this workflow by
+# renaming the file to keep-alive.yml.disabled or deleting it.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  schedule:
+    # Every 3 days at 06:00 UTC — well within the 7-day pause window
+    - cron: '0 6 */3 * *'
+
+  # Allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual trigger'
+        required: false
+        default: 'Manual keep-alive ping'
+
+jobs:
+  ping:
+    name: Ping Supabase DB
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ping Supabase REST API (wakes DB compute)
+        id: ping_supabase
+        run: |
+          echo "Pinging Supabase at ${{ secrets.SUPABASE_URL }}..."
+
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 30 \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/profiles?limit=1&select=id" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+
+          echo "HTTP Status: $RESPONSE"
+
+          if [[ "$RESPONSE" == "200" || "$RESPONSE" == "401" || "$RESPONSE" == "403" ]]; then
+            echo "✅ Supabase is alive (status $RESPONSE)"
+          else
+            echo "⚠️ Unexpected status: $RESPONSE — DB may need attention"
+            # Don't fail the workflow — just warn
+          fi
+
+      - name: Ping production API health (if deployed)
+        id: ping_api
+        continue-on-error: true  # Don't fail if API not yet deployed
+        run: |
+          API_URL="${{ secrets.API_URL || 'https://api.ribera.app' }}"
+          echo "Pinging API at $API_URL/health..."
+
+          RESPONSE=$(curl -s -o /tmp/health.json -w "%{http_code}" \
+            --max-time 30 \
+            "$API_URL/health")
+
+          echo "HTTP Status: $RESPONSE"
+
+          if [ "$RESPONSE" == "200" ]; then
+            DB_STATUS=$(cat /tmp/health.json | python3 -c "import sys,json; print(json.load(sys.stdin).get('db','?'))")
+            echo "✅ API healthy | DB: $DB_STATUS"
+          else
+            echo "ℹ️ API not reachable (status $RESPONSE) — may not be deployed yet"
+          fi
+
+      - name: Log keep-alive summary
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Ribera Keep-Alive — $(date -u '+%Y-%m-%d %H:%M UTC')"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  Supabase: ${{ steps.ping_supabase.outcome }}"
+          echo "  API:      ${{ steps.ping_api.outcome }}"
+          echo ""
+          echo "  Next run: in ~3 days"
+          echo "  Supabase pauses after: 7 days inactivity"
+          echo "  Margin: 4 days buffer ✓"

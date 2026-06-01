@@ -4,32 +4,39 @@ region: fra1
 # ─────────────────────────────────────────────────────────────────────────────
 # Ribera V2 — DigitalOcean App Platform deployment
 #
-# Architecture:
-#   API (Fastify)     → DO App Platform  ~$5/mo (512MB, 1vCPU)
-#   Database          → DO Managed PG    ~$15/mo (1GB RAM, 10GB, no pausing)
-#   Auth              → Supabase Auth    FREE (JWT verification only)
-#   Storage (images)  → Supabase Storage FREE (1GB, no DB dependency)
-#   Web/Org/Admin     → Vercel           FREE
-#   Total server cost: ~$20/month
+# Architecture (cost-optimised):
+#   API (Fastify)     → DO App Platform  ~$5/mo  (512MB, 1vCPU)
+#   Database          → Supabase FREE    $0/mo   (500MB, kept alive by GitHub Actions)
+#   Auth              → Supabase Auth    $0/mo   (unlimited users on free plan)
+#   Storage (images)  → Supabase Storage $0/mo   (1GB)
+#   Web/Org/Admin     → Vercel           $0/mo
+#   Total server cost: ~$5/month
+#
+# Supabase free DB sleeps after 7 days inactivity.
+# GitHub Actions cron pings /health every 3 days → DB never sleeps.
+# See .github/workflows/keep-alive.yml
+#
+# When you hit significant traffic, uncomment the databases: block below
+# and update DATABASE_URL/DIRECT_URL to point to DO Managed PG (~$15/mo).
 #
 # Setup steps:
-#   1. Create DB: doctl databases create ribera-db --engine pg --version 16 --region fra1 --size db-s-1vcpu-1gb
-#   2. Link app to DB in DO console (Dashboard → App → Settings → App-Level Env → Add database)
-#      OR update this file with the database component and redeploy.
-#   3. Add secrets in DO console (App → Settings → Environment Variables)
-#   4. Push to GitHub — auto-deploys on main branch push
+#   1. DO console: Apps → Create → GitHub letsgoviro/ribera-app-pwa
+#   2. Add secrets (SUPABASE_URL, DATABASE_URL, etc.) in App Settings
+#   3. Push to GitHub — auto-deploys on main branch push
+#
+# Scale-up path (when ready):
+#   1. Uncomment databases: section below
+#   2. Change DATABASE_URL/DIRECT_URL to ${db.DATABASE_URL}
+#   3. Run scripts/migrate-db-to-do.sh to move data
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── Managed PostgreSQL cluster ────────────────────────────────────────────────
-# DO injects ${db.DATABASE_URL} automatically when this component is present.
-# This replaces the Supabase DB — Supabase is now used for AUTH ONLY.
-databases:
-  - name: db
-    engine: PG
-    version: "16"
-    size: db-s-1vcpu-1gb    # $15/mo — 1GB RAM, 10GB disk, no pausing
-    num_nodes: 1
-    production: true
+# databases:                          # Uncomment to add DO Managed PG (~$15/mo)
+#   - name: db
+#     engine: PG
+#     version: "16"
+#     size: db-s-1vcpu-1gb
+#     num_nodes: 1
+#     production: true
 
 # ── API Service ───────────────────────────────────────────────────────────────
 services:
@@ -70,20 +77,17 @@ services:
         value: https://ribera.app
         scope: RUN_TIME
 
-      # ── Database — injected from the databases component above ───────────────
-      # DO automatically provides DATABASE_URL when a database is linked.
-      # For Prisma we need both the pooled URL (runtime) and direct URL (migrations).
-      # DO's managed PG provides a connection pool via PgBouncer on port 25060.
+      # ── Database — Supabase PostgreSQL (free, kept alive by GitHub Actions) ────
+      # Format: postgresql://postgres.{ref}:{password}@{host}:6543/postgres?pgbouncer=true
+      # Get from: Supabase Dashboard → Settings → Database → Connection Pooling
       - key: DATABASE_URL
-        value: ${db.DATABASE_URL}        # pooled connection (PgBouncer port 25060)
         scope: RUN_TIME
+        type: SECRET
       - key: DIRECT_URL
-        value: ${db.DATABASE_URL}        # same host; Prisma uses this for migrations only
-        scope: BUILD_TIME
+        scope: RUN_TIME
+        type: SECRET
 
-      # ── Supabase AUTH ONLY — no DB access needed ────────────────────────────
-      # These are used solely for: JWT verification, user management, Google OAuth
-      # The Supabase PostgreSQL is no longer used as application database.
+      # ── Supabase — Auth + DB + Storage ───────────────────────────────────────
       - key: SUPABASE_URL
         scope: RUN_TIME
         type: SECRET
