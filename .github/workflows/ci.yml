@@ -19,12 +19,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Node 22 matches engines.node: "22.x" in package.json (engine-strict=true in .npmrc)
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
+      # Install exact pnpm version from packageManager field
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g pnpm@11.3.0
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
@@ -52,10 +54,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g pnpm@11.3.0
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
