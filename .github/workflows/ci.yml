@@ -7,7 +7,6 @@ on:
     branches: [main]
 
 env:
-  # Stub values for build — secrets not available in forks/PRs, use placeholders
   NEXT_PUBLIC_API_URL: https://api.ribera.app
   NEXT_PUBLIC_SUPABASE_URL: https://spzpfjwkohsufvrplaom.supabase.co
   NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_placeholder
@@ -20,14 +19,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Use version from packageManager field in package.json (pnpm@11.x)
-      - uses: pnpm/action-setup@v4
-        # no version: here — reads packageManager from package.json automatically
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+
+      # corepack reads packageManager from package.json and activates pnpm@11.x
+      - name: Enable corepack (activates pnpm from packageManager field)
+        run: corepack enable && corepack prepare --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -39,11 +37,11 @@ jobs:
       - name: Type check API
         run: pnpm exec tsc --noEmit
         working-directory: apps/api
-        continue-on-error: true   # non-blocking: warns but doesn't fail deploy
+        continue-on-error: true
 
       - name: Lint
         run: pnpm lint
-        continue-on-error: true   # non-blocking: warnings allowed
+        continue-on-error: true
 
   build:
     name: Build check
@@ -53,12 +51,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+
+      - name: Enable corepack
+        run: corepack enable && corepack prepare --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
