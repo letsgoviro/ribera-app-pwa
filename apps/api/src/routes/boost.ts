@@ -31,7 +31,7 @@ export async function boostRoutes(app: FastifyInstance) {
 
   // POST /api/v1/boost/purchase — organiser only
   app.post('/purchase', { preHandler: requireOrganiser }, async (req, reply) => {
-    const { event_id, package_id, back_url } = req.body as {
+    const { event_id, package_id, redirect_url, back_url } = req.body as {
       event_id: string
       package_id: 'spark' | 'flame' | 'inferno'
       redirect_url?: string
