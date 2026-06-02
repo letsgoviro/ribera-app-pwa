@@ -9,6 +9,10 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   images: { unoptimized: true },
+  // TypeScript errors are reported by the separate typecheck job — don't block builds
+  typescript: { ignoreBuildErrors: true },
+  // ESLint errors reported separately — don't block builds
+  eslint: { ignoreDuringBuilds: true },
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001',
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
