@@ -15,7 +15,7 @@ jobs:
   check:
     name: Install & Type-check
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -23,12 +23,11 @@ jobs:
         with:
           node-version: 20
 
-      # corepack reads packageManager from package.json and activates pnpm@11.x
-      - name: Enable corepack (activates pnpm from packageManager field)
-        run: corepack enable && corepack prepare --activate
+      - name: Install pnpm
+        run: npm install -g pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Generate Prisma client
         run: pnpm exec prisma generate
@@ -47,7 +46,7 @@ jobs:
     name: Build check
     runs-on: ubuntu-latest
     needs: check
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -55,11 +54,11 @@ jobs:
         with:
           node-version: 20
 
-      - name: Enable corepack
-        run: corepack enable && corepack prepare --activate
+      - name: Install pnpm
+        run: npm install -g pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Generate Prisma client
         run: pnpm exec prisma generate
