@@ -1,4 +1,6 @@
 {
-  "buildCommand": "cd ../.. && pnpm exec turbo run build --filter=@ribera/organiser",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "installCommand": "npm install -g pnpm@11.3.0 && cd ../.. && pnpm install --no-frozen-lockfile",
+  "buildCommand": "pnpm exec next build",
+  "outputDirectory": ".next"
 }

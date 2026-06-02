@@ -1,7 +1,8 @@
 {
-  "buildCommand": "cd ../.. && pnpm install --frozen-lockfile && pnpm exec turbo run build --filter=@ribera/web",
   "framework": "nextjs",
-  "installCommand": "echo 'installed by buildCommand'",
+  "installCommand": "npm install -g pnpm@11.3.0 && cd ../.. && pnpm install --no-frozen-lockfile",
+  "buildCommand": "cd ../.. && pnpm exec prisma generate --schema=apps/api/prisma/schema.prisma; pnpm exec next build",
+  "outputDirectory": ".next",
   "headers": [
     {
       "source": "/sw.js",
